@@ -1,0 +1,100 @@
+You are building a project called "MeshFlow" — a containerized microservices 
+deployment platform with automated CI/CD and service mesh traffic management. 
+Build this incrementally, phase by phase, and stop after each phase to let me 
+review before continuing.
+
+## PROJECT OVERVIEW
+Build 3 microservices for a food-ordering system:
+1. User Service (port 3001) — signup, login (JWT auth), get user profile
+2. Product Service (port 3002) — CRUD for menu items, stock levels
+3. Order Service (port 3003) — creates orders; calls User Service to validate 
+   the user and Product Service to check stock before confirming
+
+Tech stack:
+- Language: Node.js + Express (use this unless I say otherwise)
+- Database: PostgreSQL (one instance, separate schema per service)
+- Containerization: Docker + Docker Compose
+- CI: GitHub Actions (separate workflow per service, triggered only by 
+  changes to that service's folder)
+- Container registry: Docker Hub
+- Orchestration: Kubernetes via Kind (local, free)
+- Service mesh: Linkerd (not Istio — keep it simple)
+- CD: simple `kubectl apply`/`kubectl set image` step in GitHub Actions 
+  (no Argo CD for now)
+- Monitoring: Linkerd Viz (built-in Prometheus + Grafana, no separate install)
+
+Repository structure to use:
+meshflow/
+├── user-service/ (src/, tests/, Dockerfile, package.json, k8s/)
+├── product-service/ (same structure)
+├── order-service/ (same structure)
+├── .github/workflows/ (one CI file per service)
+├── k8s/ (namespace.yaml, ingress.yaml, postgres.yaml)
+├── docker-compose.yml
+└── README.md
+
+## BUILD PHASES — go through these in order, one at a time
+
+**Phase 1 — Foundations**
+- Scaffold the repo structure above
+- Define REST API contracts for all 3 services (write them into README.md 
+  first, then implement):
+  - POST /users/register, POST /users/login, GET /users/:id
+  - GET /products, POST /products, GET /products/:id
+  - POST /orders, GET /orders/:id
+- Implement User Service (bcrypt password hashing, JWT auth) and Product 
+  Service (Postgres CRUD) with basic unit tests (Jest)
+- Implement Order Service, including HTTP calls to the other two services
+- Verify all 3 run locally together and the full order flow works end-to-end
+
+**Phase 2 — Containerization**
+- Write a multi-stage Dockerfile for each service
+- Write docker-compose.yml to run all 3 services + Postgres together
+- Verify `docker-compose up` brings up a fully working system
+
+**Phase 3 — CI Pipelines**
+- Create a GitHub Actions workflow per service that triggers only on changes 
+  to that service's folder, and: installs deps → runs tests → builds Docker 
+  image → pushes to Docker Hub
+- Use GitHub repo secrets for Docker Hub credentials — do not hardcode 
+  credentials anywhere
+
+**Phase 4 — Kubernetes**
+- Provide setup instructions for a local Kind cluster
+- Write Deployment + Service manifests for each microservice and for Postgres
+- Set up an NGINX Ingress to route external traffic in
+- Verify the full system runs and communicates correctly inside the cluster
+
+**Phase 5 — Service Mesh**
+- Provide instructions to install Linkerd CLI and control plane
+- Inject Linkerd sidecars into all 3 service deployments
+- Confirm mTLS is active between services (this is automatic with Linkerd)
+- Install Linkerd Viz and confirm the dashboard shows live traffic metrics
+- Demonstrate resilience: show what happens when a pod is killed 
+  (`kubectl delete pod`) — Kubernetes restarts it and Linkerd handles the 
+  brief disruption
+
+**Phase 6 — CD + Polish**
+- Add a step to each GitHub Actions workflow that deploys the new image to 
+  the cluster after a successful build (`kubectl set image` or 
+  `kubectl apply`, using a kubeconfig secret)
+- Write full setup documentation in README.md: architecture diagram (ASCII 
+  is fine), prerequisites, and step-by-step instructions to run everything 
+  from scratch
+- Do NOT implement canary/traffic-split routing or Argo CD/GitOps — these 
+  are explicitly out of scope for now and may be added later as a separate task
+
+## RULES
+- Work through ONE phase at a time. After finishing a phase, summarize what 
+  you built, list any assumptions you made, and wait for my confirmation 
+  before starting the next phase.
+- Keep the app logic in each microservice intentionally simple — do not add 
+  extra features beyond the API contracts defined in Phase 1.
+- Write tests as you go, not as an afterthought.
+- Flag any point where you're unsure of a design decision instead of 
+  guessing silently.
+- Use clear, well-commented code and explain non-obvious configuration 
+  (especially Kubernetes YAML and GitHub Actions YAML) inline.
+
+Start with Phase 1. Confirm the API contracts with me before writing any 
+service code.

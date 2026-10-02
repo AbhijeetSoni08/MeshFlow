@@ -1,0 +1,23 @@
+{
+  "name": "meshflow-platform",
+  "version": "1.0.0",
+  "description": "MeshFlow - Containerized microservices platform with service mesh and CI/CD",
+  "scripts": {
+    "test:user": "cd user-service && npm test",
+    "test:product": "cd product-service && npm test",
+    "test:order": "cd order-service && npm test",
+    "test": "npm run test:user && npm run test:product && npm run test:order",
+    "test:e2e": "node scripts/e2e-test.js",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down -v"
+  },
+  "keywords": [
+    "microservices",
+    "docker",
+    "linkerd",
+    "kubernetes",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC"
+}

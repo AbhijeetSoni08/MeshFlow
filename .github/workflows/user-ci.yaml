@@ -1,0 +1,46 @@
+name: User Service CI/CD
+
+on:
+  push:
+    paths:
+      - 'user-service/**'
+      - '.github/workflows/user-ci.yaml'
+  pull_request:
+    paths:
+      - 'user-service/**'
+      - '.github/workflows/user-ci.yaml'
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./user-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: user-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./user-service
+          file: ./user-service/Dockerfile
+          push: false
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/meshflow-user-service:latest

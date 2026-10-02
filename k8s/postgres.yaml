@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: meshflow
+type: Opaque
+stringData:
+  postgres-password: "meshflow_password"
+  database-url: "postgres://postgres:meshflow_password@postgres.meshflow.svc.cluster.local:5432/meshflow"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: meshflow
+data:
+  init-db.sql: |
+    CREATE SCHEMA IF NOT EXISTS users_service;
+    CREATE SCHEMA IF NOT EXISTS products_service;
+    CREATE SCHEMA IF NOT EXISTS orders_service;
+
+    CREATE TABLE IF NOT EXISTS users_service.users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS products_service.products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        description TEXT,
+        price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
+        stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS orders_service.orders (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS orders_service.order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER REFERENCES orders_service.orders(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL,
+        product_name VARCHAR(150) NOT NULL,
+        unit_price NUMERIC(10, 2) NOT NULL,
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        subtotal NUMERIC(10, 2) NOT NULL
+    );
+
+    INSERT INTO products_service.products (name, description, price, stock)
+    VALUES 
+      ('Artisan Margherita Pizza', 'Wood-fired sourdough with San Marzano tomatoes, fresh mozzarella, and basil', 14.99, 50),
+      ('Black Truffle Burger', 'Prime Angus beef patty, aged cheddar, truffle aioli on brioche', 18.50, 40),
+      ('Crispy Truffle Fries', 'Hand-cut russet potatoes tossed in white truffle oil and parmesan', 7.50, 60)
+    ON CONFLICT DO NOTHING;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: meshflow
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: meshflow
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: postgres-password
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: postgres-storage
+          emptyDir: {}
+        - name: init-script
+          configMap:
+            name: postgres-init-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: meshflow
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
