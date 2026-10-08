@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: meshflow/product-service:latest
+          image: abhijeetsoni08/meshflow-product-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3002

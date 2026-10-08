@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: meshflow/order-service:latest
+          image: abhijeetsoni08/meshflow-order-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3003
