@@ -1,0 +1,24 @@
+# Kind cluster configuration for MeshFlow
+# Maps host ports 80 and 443 to the cluster node so NGINX Ingress
+# is accessible at http://localhost after deployment.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    # These port mappings allow the NGINX Ingress Controller to
+    # receive traffic from the host machine on ports 80 and 443.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # HTTP — browser/curl on localhost:80 → Ingress pod
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      # HTTPS — browser/curl on localhost:443 → Ingress pod
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP

@@ -4,11 +4,16 @@ metadata:
   name: meshflow-ingress
   namespace: meshflow
   annotations:
-    ingress.class: "nginx"
+    # Rewrite /users/register → /users/register (keep path as-is)
+    # This is needed because our services already expect the full path
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
+  # Use the modern ingressClassName field instead of the deprecated annotation
+  ingressClassName: nginx
   rules:
     - http:
         paths:
+          # Route /users/* to user-service
           - path: /users
             pathType: Prefix
             backend:
@@ -16,6 +21,7 @@ spec:
                 name: user-service
                 port:
                   number: 3001
+          # Route /products/* to product-service
           - path: /products
             pathType: Prefix
             backend:
@@ -23,6 +29,7 @@ spec:
                 name: product-service
                 port:
                   number: 3002
+          # Route /orders/* to order-service
           - path: /orders
             pathType: Prefix
             backend:
