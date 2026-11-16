@@ -91,12 +91,12 @@ ok "Linkerd control plane is running."
 # so the mutating webhook injects the Linkerd proxy sidecar.
 log "Restarting deployments to inject Linkerd sidecars..."
 
-for svc in user-service product-service order-service postgres; do
+for svc in user-service product-service order-service frontend postgres; do
     kubectl rollout restart deployment/"$svc" -n "$NAMESPACE"
 done
 
 log "Waiting for rollouts to complete..."
-for svc in user-service product-service order-service postgres; do
+for svc in user-service product-service order-service frontend postgres; do
     kubectl rollout status deployment/"$svc" -n "$NAMESPACE" --timeout=120s
     ok "$svc restarted with Linkerd sidecar."
 done

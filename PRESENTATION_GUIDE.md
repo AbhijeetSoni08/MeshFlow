@@ -104,11 +104,32 @@ kubectl get pods -n meshflow -o wide
 
 ---
 
-### Act 2: End-to-End Business Flow Through Ingress
+### Act 2: Interactive Web Portal & End-to-End Business Flow
 **What to say:**
-> *"Now let's trace a complete distributed food ordering workflow through our NGINX Ingress controller."*
+> *"We built an interactive, dark-mode frontend portal that connects directly to the NGINX Ingress controller at `http://localhost/` so you can visually experience the entire distributed system in action."*
 
-#### 2a. Browse the Menu Catalog (Product Service)
+#### Option A: Visual Web Demonstration (Recommended for Presentations!)
+1. Open `http://localhost/` in your browser (In Codespaces, click the forwarded Port 80 notification or open port 80 in the PORTS tab).
+2. **Point out the Live Health Indicators** in the top bar: User Service (:3001), Product Service (:3002), and Order Service (:3003).
+3. **1-Click Authentication**:
+   - The portal auto-signs in with `test@example.com` or click **"Register New"**.
+   - Show the active JWT Token and user profile card.
+4. **Browse & Add Items to Cart**:
+   - Show live product cards loaded dynamically from `products_service` PostgreSQL schema.
+   - Click `+ Add` on **Artisan Margherita Pizza** and **Crispy Truffle Fries**.
+5. **Click "Place Order via Orchestrator"**:
+   - Watch the **Distributed Trace Timeline** light up step-by-step:
+     1. Ingress receives `POST /orders`
+     2. Order Service $\rightarrow$ User Service (`GET /users/:id`) [🔒 mTLS Verified]
+     3. Order Service $\rightarrow$ Product Service (`PATCH /products/:id/stock`) [🔒 mTLS Verified]
+     4. PostgreSQL commits to `orders_service` schema
+   - Point out that the product stock instantly decrements on screen, and the new order appears in the **Completed Orders** list!
+6. **Live Traffic Burst**: Click the **"Send 15 Test Requests"** button in the header to instantly generate traffic for Linkerd Viz.
+
+#### Option B: Terminal CLI Demonstration (curl)
+If demonstrating via the terminal:
+
+##### 2a. Browse the Menu Catalog (Product Service)
 ```bash
 curl -s http://localhost/products | jq
 ```

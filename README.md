@@ -7,6 +7,7 @@ meshflow/
 ├── user-service/         # User registration, JWT authentication & profiles (Port 3001)
 ├── product-service/      # Menu catalog, pricing & inventory management (Port 3002)
 ├── order-service/        # Order orchestration with distributed user & stock checks (Port 3003)
+├── frontend/             # Single-page web portal with live orchestration tracer & store UI
 ├── .github/workflows/    # Service-isolated CI/CD pipelines (User, Product, Order)
 ├── k8s/                  # Kubernetes manifests (Namespace, Ingress, PostgreSQL)
 ├── scripts/              # Automated setup & orchestration scripts (K8s, Linkerd, E2E)

@@ -122,13 +122,22 @@ for svc in user-service product-service order-service; do
     ok "Deployed ${svc}."
 done
 
+# Frontend UI Portal
+kubectl create configmap frontend-html \
+    --from-file=index.html="${PROJECT_DIR}/frontend/index.html" \
+    --namespace "$NAMESPACE" \
+    --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "${PROJECT_DIR}/frontend/k8s/deployment.yaml"
+kubectl apply -f "${PROJECT_DIR}/frontend/k8s/service.yaml"
+ok "Deployed frontend portal."
+
 # Ingress
 kubectl apply -f "${PROJECT_DIR}/k8s/ingress.yaml"
 ok "Ingress rules applied."
 
 # ---- Step 6: Wait for All Pods ----
 log "Waiting for all microservice pods to be ready (up to 180s)..."
-for svc in user-service product-service order-service; do
+for svc in user-service product-service order-service frontend; do
     kubectl wait --namespace "$NAMESPACE" \
         --for=condition=ready pod \
         --selector=app="$svc" \

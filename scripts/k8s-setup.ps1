@@ -1,4 +1,4 @@
-# ==================================================================
+﻿# ==================================================================
 # MeshFlow — Kubernetes Setup Script (Kind) — PowerShell Edition
 # ==================================================================
 # This script sets up a local Kind cluster, installs the NGINX
@@ -105,13 +105,23 @@ foreach ($svc in $services) {
     Ok "Deployed $svc."
 }
 
+# Frontend UI Portal
+kubectl create configmap frontend-html `
+    --from-file=index.html="$ProjectDir\frontend\index.html" `
+    --namespace $Namespace `
+    --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "$ProjectDir\frontend\k8s\deployment.yaml"
+kubectl apply -f "$ProjectDir\frontend\k8s\service.yaml"
+Ok "Deployed frontend portal."
+
 # Ingress
 kubectl apply -f "$ProjectDir\k8s\ingress.yaml"
 Ok "Ingress rules applied."
 
 # ---- Step 6: Wait for All Pods ----
 Log "Waiting for all microservice pods to be ready (up to 180s)..."
-foreach ($svc in $services) {
+$allServices = @("user-service", "product-service", "order-service", "frontend")
+foreach ($svc in $allServices) {
     kubectl wait --namespace $Namespace `
         --for=condition=ready pod `
         --selector=app=$svc `
