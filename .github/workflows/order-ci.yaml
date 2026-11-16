@@ -54,3 +54,18 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/meshflow-order-service:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/meshflow-order-service:${{ github.sha }}
+
+      # Phase 6: Continuous Deployment via kubectl set image
+      - name: Deploy to Kubernetes cluster
+        if: github.event_name == 'push'
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+        run: |
+          if [ -z "$KUBECONFIG_DATA" ]; then
+            echo "::notice::KUBECONFIG secret is not configured in repository secrets. Skipping remote cluster deployment."
+            exit 0
+          fi
+          mkdir -p $HOME/.kube
+          echo "$KUBECONFIG_DATA" | base64 -d > $HOME/.kube/config 2>/dev/null || echo "$KUBECONFIG_DATA" > $HOME/.kube/config
+          kubectl set image deployment/order-service order-service=${{ secrets.DOCKERHUB_USERNAME }}/meshflow-order-service:${{ github.sha }} -n meshflow
+          kubectl rollout status deployment/order-service -n meshflow --timeout=180s

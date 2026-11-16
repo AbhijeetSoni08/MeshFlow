@@ -1,43 +1,66 @@
-# MeshFlow — Microservices Platform
+# MeshFlow — Microservices & Service Mesh Platform
 
-MeshFlow is a containerized microservices platform for a high-performance food ordering system. It features automated CI/CD, database isolation with PostgreSQL, and service-mesh readiness (Linkerd) for Kubernetes deployments.
+MeshFlow is an enterprise-grade, containerized microservices platform for a high-performance food ordering system. It features database isolation using PostgreSQL schemas, service-isolated GitHub Actions CI/CD with automated Kubernetes deployments, and a Linkerd service mesh delivering zero-trust mTLS encryption and deep observability.
 
 ```
 meshflow/
-├── user-service/         # User registration, JWT authentication & profile management (Port 3001)
-├── product-service/      # Menu items catalog, pricing & inventory management (Port 3002)
+├── user-service/         # User registration, JWT authentication & profiles (Port 3001)
+├── product-service/      # Menu catalog, pricing & inventory management (Port 3002)
 ├── order-service/        # Order orchestration with distributed user & stock checks (Port 3003)
-├── .github/workflows/    # Service-isolated CI/CD workflows
+├── .github/workflows/    # Service-isolated CI/CD pipelines (User, Product, Order)
 ├── k8s/                  # Kubernetes manifests (Namespace, Ingress, PostgreSQL)
+├── scripts/              # Automated setup & orchestration scripts (K8s, Linkerd, E2E)
 ├── docker-compose.yml    # Local multi-container development environment
+├── kind-config.yaml      # Kind cluster configuration with Ingress port mapping
 └── README.md
 ```
 
 ---
 
-## 🏗️ Architecture & Interaction Flow
+## 🏗️ Architecture & Service Mesh Topology
 
-```mermaid
-graph TD
-    Client[Client / Ingress]
-    
-    subgraph MeshFlow Platform
-        US[User Service :3001]
-        PS[Product Service :3002]
-        OS[Order Service :3003]
-        DB[(PostgreSQL - Shared Instance)]
-        
-        US -->|Schema: users_service| DB
-        PS -->|Schema: products_service| DB
-        OS -->|Schema: orders_service| DB
-        
-        OS -->|1. Validate User / Auth| US
-        OS -->|2. Verify Stock & Deduct| PS
-    end
-    
-    Client -->|Auth / Register| US
-    Client -->|Browse Catalog| PS
-    Client -->|Place / View Order| OS
+### ASCII Architecture Diagram
+
+```
+                             [ External Client / Traffic ]
+                                          │
+                                    (HTTP Port 80)
+                                          ▼
+                      ┌───────────────────────────────────────┐
+                      │    NGINX Ingress Controller (Kind)    │
+                      └───────────────────┬───────────────────┘
+                                          │
+                   ┌──────────────────────┼──────────────────────┐
+            /users │            /products │              /orders │
+                   ▼                      ▼                      ▼
+        ┌─────────────────────┐┌─────────────────────┐┌─────────────────────┐
+        │    User Service     ││   Product Service   ││    Order Service    │
+        │  ┌───────────────┐  ││  ┌───────────────┐  ││  ┌───────────────┐  │
+        │  │ linkerd-proxy │◄─┼┼─►│ linkerd-proxy │◄─┼┼─►│ linkerd-proxy │  │
+        │  └───────┬───────┘  ││  └───────┬───────┘  ││  └───────┬───────┘  │
+        │          │          ││          │          ││          │          │
+        │    [App Container]  ││    [App Container]  ││    [App Container]  │
+        │     (Port 3001)     ││     (Port 3002)     ││     (Port 3003)     │
+        └──────────┬──────────┘└──────────┬──────────┘└──────────┬──────────┘
+                   │                      │                      │
+                   │    (mTLS / Zero-Trust Service Mesh)         │
+                   │  ┌───────────────────┴───────────────────┐  │
+                   │  │ Order Service validates user via US   │  │
+                   │  │ Order Service reserves stock via PS   │  │
+                   │  └───────────────────────────────────────┘  │
+                   ▼                      ▼                      ▼
+         ┌──────────────────────────────────────────────────────────────┐
+         │              PostgreSQL Shared Instance (Port 5432)          │
+         │  ┌────────────────────┬────────────────────┬──────────────┐  │
+         │  │ users_service      │ products_service   │orders_service│  │
+         │  │ (users table)      │ (products table)   │(orders,items)│  │
+         │  └────────────────────┴────────────────────┴──────────────┘  │
+         └──────────────────────────────────────────────────────────────┘
+                                          ▲
+                                          │ Metrics Scrape (mTLS)
+                      ┌───────────────────┴───────────────────┐
+                      │    Linkerd Viz (Prometheus & Dashboard)│
+                      └───────────────────────────────────────┘
 ```
 
 ---
@@ -48,7 +71,7 @@ graph TD
 Base Path: `/users`
 
 #### `POST /users/register`
-Creates a new user account. Passwords are encrypted using bcrypt before storage.
+Creates a new user account with bcrypt password hashing.
 - **Request Body:**
 ```json
 {
@@ -61,20 +84,18 @@ Creates a new user account. Passwords are encrypted using bcrypt before storage.
 ```json
 {
   "message": "User registered successfully",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "1",
+    "id": 1,
     "name": "Alex Johnson",
     "email": "alex@example.com",
-    "createdAt": "2026-09-24T12:00:00.000Z"
+    "createdAt": "2026-11-16T12:00:00.000Z"
   }
 }
 ```
-- **Error `400 Bad Request`:** Missing required fields or duplicate email.
-
----
 
 #### `POST /users/login`
-Authenticates user credentials and issues a signed JSON Web Token (JWT).
+Authenticates credentials and returns a signed JWT.
 - **Request Body:**
 ```json
 {
@@ -88,29 +109,17 @@ Authenticates user credentials and issues a signed JSON Web Token (JWT).
   "message": "Login successful",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "1",
+    "id": 1,
     "name": "Alex Johnson",
     "email": "alex@example.com"
   }
 }
 ```
-- **Error `401 Unauthorized`:** Invalid email or password.
-
----
 
 #### `GET /users/:id`
-Retrieves public profile for a user ID. Protected by Bearer token or inter-service auth.
+Retrieves public profile for user ID.
 - **Headers:** `Authorization: Bearer <token>`
-- **Response `200 OK`:**
-```json
-{
-  "id": "1",
-  "name": "Alex Johnson",
-  "email": "alex@example.com",
-  "createdAt": "2026-09-24T12:00:00.000Z"
-}
-```
-- **Error `404 Not Found`:** User does not exist.
+- **Response `200 OK`**
 
 ---
 
@@ -118,83 +127,29 @@ Retrieves public profile for a user ID. Protected by Bearer token or inter-servi
 Base Path: `/products`
 
 #### `GET /products`
-Fetches all available menu products with current inventory.
+Fetches all menu items with active stock.
 - **Response `200 OK`:**
 ```json
 [
   {
-    "id": "1",
+    "id": 1,
     "name": "Artisan Margherita Pizza",
-    "description": "Wood-fired with San Marzano tomatoes and fresh mozzarella",
+    "description": "Wood-fired sourdough with San Marzano tomatoes, fresh mozzarella, and basil",
     "price": 14.99,
-    "stock": 50,
-    "createdAt": "2026-09-24T12:00:00.000Z"
+    "stock": 50
   }
 ]
 ```
 
----
-
 #### `POST /products`
-Adds a new menu item to the catalog.
-- **Request Body:**
-```json
-{
-  "name": "Truffle Burger",
-  "description": "Prime Angus beef with black truffle aioli",
-  "price": 18.50,
-  "stock": 30
-}
-```
-- **Response `201 Created`:**
-```json
-{
-  "id": "2",
-  "name": "Truffle Burger",
-  "description": "Prime Angus beef with black truffle aioli",
-  "price": 18.50,
-  "stock": 30,
-  "createdAt": "2026-09-24T12:00:00.000Z"
-}
-```
-
----
-
-#### `GET /products/:id`
-Fetches a single product by ID.
-- **Response `200 OK`:**
-```json
-{
-  "id": "2",
-  "name": "Truffle Burger",
-  "description": "Prime Angus beef with black truffle aioli",
-  "price": 18.50,
-  "stock": 30,
-  "createdAt": "2026-09-24T12:00:00.000Z"
-}
-```
-- **Error `404 Not Found`:** Product not found.
-
----
+Adds a new product to the catalog.
+- **Request Body:** `{"name": "Truffle Fries", "price": 7.50, "stock": 40}`
+- **Response `201 Created`**
 
 #### `PATCH /products/:id/stock`
-Adjusts or decrements stock level (used during order placement).
-- **Request Body:**
-```json
-{
-  "quantityChange": -2
-}
-```
-- **Response `200 OK`:**
-```json
-{
-  "id": "2",
-  "name": "Truffle Burger",
-  "stock": 28,
-  "updatedAt": "2026-09-24T12:00:00.000Z"
-}
-```
-- **Error `400 Bad Request`:** Insufficient stock.
+Atomically adjusts or reserves inventory.
+- **Request Body:** `{"quantityChange": -2}`
+- **Response `200 OK`**
 
 ---
 
@@ -202,131 +157,178 @@ Adjusts or decrements stock level (used during order placement).
 Base Path: `/orders`
 
 #### `POST /orders`
-Creates a food order. Steps performed internally:
-1. Validates user existence with **User Service** (`GET /users/:userId`).
-2. Checks stock and reserves items with **Product Service** (`GET /products/:id` and `PATCH /products/:id/stock`).
-3. Computes order total and persists the order record in PostgreSQL.
+Orchestrates order placement:
+1. Calls **User Service** (`GET /users/:userId`) to validate user existence.
+2. Calls **Product Service** (`GET /products/:id` & `PATCH /products/:id/stock`) to verify stock and deduct quantities.
+3. Persists order & order items in `orders_service` schema inside PostgreSQL.
 
 - **Headers:** `Authorization: Bearer <token>` (optional for inter-service, validated if supplied)
 - **Request Body:**
 ```json
 {
-  "userId": "1",
+  "userId": 1,
   "items": [
-    { "productId": "1", "quantity": 2 },
-    { "productId": "2", "quantity": 1 }
+    { "productId": 1, "quantity": 2 }
   ]
 }
 ```
 - **Response `201 Created`:**
 ```json
 {
-  "id": "1",
-  "userId": "1",
-  "totalAmount": 48.48,
+  "id": 1,
+  "userId": 1,
+  "totalAmount": 29.98,
   "status": "CONFIRMED",
   "items": [
     {
-      "productId": "1",
+      "productId": 1,
       "productName": "Artisan Margherita Pizza",
       "unitPrice": 14.99,
       "quantity": 2,
       "subtotal": 29.98
-    },
-    {
-      "productId": "2",
-      "productName": "Truffle Burger",
-      "unitPrice": 18.50,
-      "quantity": 1,
-      "subtotal": 18.50
     }
-  ],
-  "createdAt": "2026-09-24T12:00:00.000Z"
+  ]
 }
 ```
-- **Error `400 Bad Request`:** Out of stock or invalid items.
-- **Error `404 Not Found`:** User or Product does not exist.
-
----
 
 #### `GET /orders/:id`
-Retrieves an order by ID along with itemized details.
-- **Response `200 OK`:**
-```json
-{
-  "id": "1",
-  "userId": "1",
-  "totalAmount": 48.48,
-  "status": "CONFIRMED",
-  "items": [
-    {
-      "productId": "1",
-      "productName": "Artisan Margherita Pizza",
-      "unitPrice": 14.99,
-      "quantity": 2,
-      "subtotal": 29.98
-    }
-  ],
-  "createdAt": "2026-09-24T12:00:00.000Z"
-}
-```
+Retrieves order details and item breakdown.
 
 ---
 
-## 🗄️ Database Architecture (Single DB, Isolated Schemas)
+## 📋 Prerequisites
 
-PostgreSQL Database: `meshflow`
-- **Schema `users_service`**:
-  - `users` (id, name, email, password_hash, created_at, updated_at)
-- **Schema `products_service`**:
-  - `products` (id, name, description, price, stock, created_at, updated_at)
-- **Schema `orders_service`**:
-  - `orders` (id, user_id, total_amount, status, created_at, updated_at)
-  - `order_items` (id, order_id, product_id, product_name, unit_price, quantity, subtotal)
-
----
-
-## 🐳 Containerization Architecture (Phase 2)
-
-Each microservice leverages an optimized, multi-stage Alpine Dockerfile:
-- **Dependencies Stage**: Runs `npm ci --only=production` against package lockfiles to build a clean layer cache.
-- **Production Stage**: Runs on a stripped-down `node:18-alpine` base image, drops privileges to the unprivileged `node` user (`USER node`), and sets `--chown=node:node`.
-- **`.dockerignore`**: Excludes local `node_modules`, test files, `.git`, and `.env` secrets from leaking into container images.
-- **Network Topology**: All services communicate across an isolated bridge network (`meshflow-network`).
-- **Health Checks & Dependency Ordering**:
-  - `postgres` checks readiness via `pg_isready -U postgres -d meshflow`.
-  - Node services check readiness using Node.js native HTTP calls against `/health`.
-  - `order-service` strictly waits for `user-service`, `product-service`, and `postgres` to be in a healthy state before starting.
+Before running from scratch, ensure you have:
+- **Git**
+- **Node.js 18+** & `npm`
+- **Docker Engine** (or Docker Desktop / GitHub Codespaces)
+- **kubectl** (`v1.26+`)
+- **kind** (`v0.20+`)
+- **Linkerd CLI** (`edge-26.11+` or `stable-2.14+`)
+- **jq** and **curl** (for CLI testing)
 
 ---
 
-## 🚀 Running Locally
+## 🚀 Running Everything From Scratch
 
-### 1. Launch with Docker Compose
-```bash
-docker compose up --build
-```
-This starts:
-- `meshflow-postgres` on port `5432`
-- `meshflow-user-service` on port `3001`
-- `meshflow-product-service` on port `3002`
-- `meshflow-order-service` on port `3003`
+### Option A: Local Multi-Container Dev (Docker Compose)
 
-### 2. Verify End-to-End Distributed Flow
-Once containers are running, execute the automated E2E test suite to verify distributed user authentication, menu catalog browsing, stock deduction, and rollback:
-```bash
-npm run test:e2e
-```
+Ideal for rapid local development without Kubernetes:
 
-### 3. Run Unit Tests (Jest)
-Run unit tests for all services from the root:
 ```bash
+# 1. Start all 3 microservices and PostgreSQL
+docker compose up --build -d
+
+# 2. Run unit tests
 npm test
-```
-Or individually:
-```bash
-cd user-service && npm test
-cd product-service && npm test
-cd order-service && npm test
+
+# 3. Run end-to-end integration tests
+npm run test:e2e
+
+# 4. Stop environment
+docker compose down -v
 ```
 
+---
+
+### Option B: Local Kubernetes Deployment (Kind + Ingress)
+
+Deploys the entire production-like cluster onto Kind with NGINX Ingress:
+
+```bash
+# 1. Run the automated Kubernetes setup script
+bash scripts/k8s-setup.sh
+# (On Windows PowerShell: .\scripts\k8s-setup.ps1)
+
+# 2. Verify all pods and ingress are running
+kubectl get pods -n meshflow
+kubectl get ingress -n meshflow
+```
+
+Test endpoints through Ingress:
+```bash
+# View menu
+curl -s http://localhost/products | jq
+
+# Register user
+curl -s http://localhost/users/register \
+  -X POST -H "Content-Type: application/json" \
+  -d '{"name":"Alex","email":"alex@example.com","password":"Password123!"}' | jq
+```
+
+---
+
+### Option C: Service Mesh & mTLS (Linkerd)
+
+Injects Linkerd sidecars into every pod, enables mutual TLS (mTLS), and spins up real-time observability:
+
+```bash
+# 1. Run Linkerd setup script
+bash scripts/linkerd-setup.sh
+
+# 2. Add linkerd to your PATH
+export PATH="$HOME/.linkerd2/bin:$PATH"
+
+# 3. Inspect meshed pods (Notice 2/2 containers: App + Proxy)
+kubectl get pods -n meshflow
+
+# 4. Verify mTLS encryption between services
+linkerd viz -n meshflow edges deployment
+
+# 5. Monitor live throughput & latency
+linkerd viz -n meshflow stat deployment
+
+# 6. Launch real-time visual dashboard
+linkerd viz dashboard &
+```
+
+---
+
+## 🧪 Resilience & Chaos Testing
+
+Test Kubernetes self-healing and Linkerd traffic resilience under pod failure:
+
+```bash
+# 1. Terminate an active user-service pod
+POD_NAME=$(kubectl get pod -n meshflow -l app=user-service -o jsonpath='{.items[0].metadata.name}')
+kubectl delete pod -n meshflow $POD_NAME
+
+# 2. Immediately observe replacement
+kubectl get pods -n meshflow
+```
+
+*Result:* Kubernetes spins up an immediate replacement pod with the Linkerd sidecar injected automatically. Traffic continues to be routed to healthy replicas with zero downtime.
+
+---
+
+## 🔄 CI/CD Pipelines (GitHub Actions)
+
+MeshFlow implements path-filtered, service-isolated CI/CD workflows:
+- `.github/workflows/user-ci.yaml`
+- `.github/workflows/product-ci.yaml`
+- `.github/workflows/order-ci.yaml`
+
+### How the Pipeline Works:
+1. **Trigger**: Triggers automatically on push/PR only when files within the service's folder change.
+2. **Testing**: Runs Jest unit test suites in a clean Node 18 environment.
+3. **Build & Push**: Builds multi-stage production Docker images and publishes them to Docker Hub with tags `:latest` and `:${{ github.sha }}`.
+4. **Continuous Deployment (CD)**:
+   - Uses `kubectl set image deployment/<service> <service>=<image>:${{ github.sha }} -n meshflow` to trigger zero-downtime rolling updates on the target cluster.
+   - Monitors rollout status with `kubectl rollout status`.
+
+### Required GitHub Secrets:
+To enable automated container publishing and deployment, set these repository secrets:
+- `DOCKERHUB_USERNAME`: Your Docker Hub account username.
+- `DOCKERHUB_TOKEN`: Personal Access Token with write permissions.
+- `KUBECONFIG`: *(Optional for remote cluster)* Base64-encoded or raw `kubeconfig` file for remote cluster deployment. If omitted, the CD step logs an informative skip notice without failing the CI pipeline.
+
+---
+
+## 🧹 Teardown
+
+To cleanly remove all local resources:
+
+```bash
+# Delete the Kind cluster
+kind delete cluster --name meshflow
+```
