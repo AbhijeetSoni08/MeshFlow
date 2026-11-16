@@ -58,6 +58,20 @@ ok "Kind cluster created."
 log "Installing NGINX Ingress Controller for Kind..."
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
+log "Waiting for Ingress Controller pods to be created..."
+# The Deployment takes a few seconds to schedule pods. Loop until at
+# least one pod matching the selector exists before calling kubectl wait.
+for i in $(seq 1 30); do
+    POD_COUNT=$(kubectl get pods --namespace ingress-nginx \
+        --selector=app.kubernetes.io/component=controller \
+        --no-headers 2>/dev/null | wc -l)
+    if [ "$POD_COUNT" -gt 0 ]; then
+        break
+    fi
+    echo "  ...pods not created yet, retrying in 5s ($i/30)"
+    sleep 5
+done
+
 log "Waiting for Ingress Controller to be ready (up to 120s)..."
 kubectl wait --namespace ingress-nginx \
     --for=condition=ready pod \
