@@ -67,7 +67,12 @@ log "Running Linkerd pre-install checks..."
 linkerd check --pre || warn "Some pre-checks had warnings (often OK in Kind)."
 ok "Pre-install checks complete."
 
-# ---- Step 4: Install Linkerd CRDs ----
+# ---- Step 4: Install Gateway API CRDs (required by Linkerd edge) ----
+log "Installing Gateway API CRDs..."
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
+ok "Gateway API CRDs installed."
+
+# ---- Step 5: Install Linkerd CRDs ----
 log "Installing Linkerd CRDs (Custom Resource Definitions)..."
 linkerd install --crds | kubectl apply -f -
 ok "Linkerd CRDs installed."
