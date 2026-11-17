@@ -1,4 +1,4 @@
-﻿# ==================================================================
+# ==================================================================
 # MeshFlow — Kubernetes Setup Script (Kind) — PowerShell Edition
 # ==================================================================
 # This script sets up a local Kind cluster, installs the NGINX
