@@ -162,7 +162,7 @@
           <div class="border-t border-slate-800 pt-3 space-y-3">
             <div class="flex items-center justify-between text-xs">
               <span class="text-slate-400">Order Subtotal</span>
-              <span id="cart-total" class="font-bold text-white text-base font-mono">$0.00</span>
+              <span id="cart-total" class="font-bold text-white text-base font-mono">₹0.00</span>
             </div>
 
             <button id="btn-checkout" onclick="placeOrder()" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-medium text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20">
@@ -380,7 +380,7 @@
             <div>
               <div class="flex items-start justify-between gap-2">
                 <h4 class="text-xs font-bold text-white">${p.name}</h4>
-                <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(p.price).toFixed(2)}</span>
+                <span class="text-xs font-mono font-bold text-emerald-400">₹${parseFloat(p.price).toFixed(2)}</span>
               </div>
               <p class="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">${p.description || 'Freshly prepared item'}</p>
             </div>
@@ -437,7 +437,7 @@
 
       if (items.length === 0) {
         container.innerHTML = '<p class="text-xs text-slate-500 italic py-6 text-center">Your cart is empty. Add menu items on the right!</p>';
-        totalEl.innerText = '$0.00';
+        totalEl.innerText = '₹0.00';
         checkoutBtn.disabled = true;
         return;
       }
@@ -450,7 +450,7 @@
           <div class="flex items-center justify-between text-xs bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
             <div class="truncate max-w-[170px]">
               <p class="font-medium text-slate-200 truncate">${product.name}</p>
-              <p class="text-[10px] text-slate-500 font-mono">$${parseFloat(product.price).toFixed(2)} each</p>
+              <p class="text-[10px] text-slate-500 font-mono">₹${parseFloat(product.price).toFixed(2)} each</p>
             </div>
             <div class="flex items-center gap-2">
               <div class="flex items-center border border-slate-700 rounded bg-slate-900">
@@ -458,13 +458,13 @@
                 <span class="px-2 text-[11px] font-mono text-white">${quantity}</span>
                 <button onclick="changeCartQty(${product.id}, 1)" class="px-2 py-0.5 hover:bg-slate-800 text-slate-300">+</button>
               </div>
-              <span class="font-mono text-white text-[11px] w-12 text-right">$${subtotal.toFixed(2)}</span>
+              <span class="font-mono text-white text-[11px] w-12 text-right">₹${subtotal.toFixed(2)}</span>
             </div>
           </div>
         `;
       }).join('');
 
-      totalEl.innerText = `$${grandTotal.toFixed(2)}`;
+      totalEl.innerText = `₹${grandTotal.toFixed(2)}`;
       checkoutBtn.disabled = !state.currentUser;
       if (!state.currentUser) {
         checkoutBtn.title = 'Please sign in first to place an order';
@@ -596,7 +596,7 @@
         setTraceStep(3, 'done');
         setTraceStep(4, 'done');
 
-        showToast(`Order #${data.id} confirmed! ($${data.totalAmount})`, 'success');
+        showToast(`Order #${data.id} confirmed! (₹${data.totalAmount})`, 'success');
 
         // Reset cart, refresh products (stocks decremented), add to orders list
         state.cart = {};
@@ -630,13 +630,13 @@
               <span class="text-indigo-400">#${o.id}</span>
               <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono">${o.status}</span>
             </span>
-            <span class="font-mono text-xs font-bold text-emerald-400">$${parseFloat(o.totalAmount).toFixed(2)}</span>
+            <span class="font-mono text-xs font-bold text-emerald-400">₹${parseFloat(o.totalAmount).toFixed(2)}</span>
           </div>
           <div class="text-[11px] text-slate-400 space-y-1">
             ${(o.items || []).map(i => `
               <div class="flex justify-between font-mono">
                 <span>${i.quantity}x ${i.productName}</span>
-                <span>$${parseFloat(i.subtotal).toFixed(2)}</span>
+                <span>₹${parseFloat(i.subtotal).toFixed(2)}</span>
               </div>
             `).join('')}
           </div>
